@@ -18,17 +18,21 @@ public class AppSettings
     public bool AutoHideOnMouseLeave { get; set; } = false;
     public bool Topmost { get; set; } = true;
     public bool HideFromAltTab { get; set; } = true;
+    public bool ExcludeFromCapture { get; set; } = true; // 防截圖與防螢幕分享 (WDA_EXCLUDEFROMCAPTURE)
     public string BossKeyGesture { get; set; } = "Alt+Q";
+    public string BossKeyAction { get; set; } = "HideWindow"; // "HideWindow" 或 "FakeException"
+    public string CamouflageMode { get; set; } = "None";      // "None", "SystemLog", "CSharpCode"
 
-    // 閱讀控制設定
+    // 閱讀與自動巡航控制設定
     public double ScrollStepPixels { get; set; } = 48.0;
+    public double AutoScrollSpeed { get; set; } = 22.0; // 每秒自動捲動像素數
     public bool ShowMiniStatusBar { get; set; } = true;
 
     // 視窗位置與尺寸記憶
     public double WindowLeft { get; set; } = 160.0;
     public double WindowTop { get; set; } = 540.0;
-    public double WindowWidth { get; set; } = 640.0;
-    public double WindowHeight { get; set; } = 210.0;
+    public double WindowWidth { get; set; } = 660.0;
+    public double WindowHeight { get; set; } = 220.0;
 
     // 上次開啟的書籍 ID
     public string? LastOpenedBookId { get; set; }

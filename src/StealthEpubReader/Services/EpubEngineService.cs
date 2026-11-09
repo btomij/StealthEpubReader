@@ -302,6 +302,59 @@ public class EpubEngineService : IDisposable
         return Regex.Replace(decoded, @"\s+", " ").Trim();
     }
 
+    /// <summary>
+    /// 跨章節全書關鍵字搜尋，回傳匹配的章節、預估捲動位置比例與前後文摘要
+    /// </summary>
+    public async Task<List<SearchResultItem>> SearchInBookAsync(string keyword, int maxResults = 120)
+    {
+        var results = new List<SearchResultItem>();
+        if (string.IsNullOrWhiteSpace(keyword) || _spineFiles.Count == 0)
+        {
+            return results;
+        }
+
+        string query = keyword.Trim();
+        for (int chIdx = 0; chIdx < _spineFiles.Count; chIdx++)
+        {
+            if (!_chapterCache.TryGetValue(chIdx, out var chapter))
+            {
+                chapter = await ParseChapterInternalAsync(chIdx).ConfigureAwait(false);
+                _chapterCache.TryAdd(chIdx, chapter);
+            }
+
+            int totalParas = Math.Max(1, chapter.Paragraphs.Count);
+            for (int pIdx = 0; pIdx < chapter.Paragraphs.Count; pIdx++)
+            {
+                string para = chapter.Paragraphs[pIdx];
+                int matchPos = para.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+                if (matchPos >= 0)
+                {
+                    int start = Math.Max(0, matchPos - 18);
+                    int len = Math.Min(para.Length - start, query.Length + 46);
+                    string snippet = (start > 0 ? "..." : "") +
+                                     para.Substring(start, len) +
+                                     (start + len < para.Length ? "..." : "");
+
+                    double ratio = totalParas > 1 ? (double)pIdx / (totalParas - 1) : 0.0;
+                    results.Add(new SearchResultItem
+                    {
+                        ChapterIndex = chIdx,
+                        ChapterTitle = chapter.Title,
+                        ScrollRatio = Math.Clamp(ratio, 0.0, 1.0),
+                        Snippet = snippet
+                    });
+
+                    if (results.Count >= maxResults)
+                    {
+                        return results;
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
     public void DisposeCurrentBook()
     {
         _chapterCache.Clear();

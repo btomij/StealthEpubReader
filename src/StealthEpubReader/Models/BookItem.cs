@@ -14,6 +14,7 @@ public class BookItem
     public double ScrollRatio { get; set; } = 0.0;
     public double VerticalOffset { get; set; } = 0.0;
     public DateTime LastReadTime { get; set; } = DateTime.Now;
+    public List<BookmarkItem> Bookmarks { get; set; } = new();
 
     [JsonIgnore]
     public double OverallProgressPercent

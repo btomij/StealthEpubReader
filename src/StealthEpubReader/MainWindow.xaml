@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title=" HostProcess"
-        Width="640" Height="210"
-        MinWidth="220" MinHeight="38"
+        Width="680" Height="220"
+        MinWidth="240" MinHeight="38"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -35,8 +35,8 @@
             <Setter Property="Foreground" Value="#CC999999" />
             <Setter Property="BorderBrush" Value="#33888888" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,1" />
-            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Padding" Value="5,1" />
+            <Setter Property="Margin" Value="1.5,0" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -77,7 +77,7 @@
             <Border x:Name="TopMicroBar"
                     Grid.Row="0"
                     Background="#10000000"
-                    Padding="6,2"
+                    Padding="5,2"
                     Opacity="0.40"
                     MouseEnter="TopMicroBar_MouseEnter"
                     MouseLeave="TopMicroBar_MouseLeave">
@@ -92,39 +92,43 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="BtnLibrary" Style="{StaticResource StealthBtn}" Content="書庫" ToolTip="開啟極簡書庫 (Ctrl+B / 支援直接拖放 .epub)" Click="BtnLibrary_Click" />
                         <Button x:Name="BtnToc" Style="{StaticResource StealthBtn}" Content="目錄" ToolTip="章節跳轉目錄 (Ctrl+T)" Click="BtnToc_Click" />
+                        <Button x:Name="BtnSearch" Style="{StaticResource StealthBtn}" Content="搜尋" ToolTip="全書關鍵字搜尋 (Ctrl+F)" Click="BtnSearch_Click" />
+                        <Button x:Name="BtnAddBookmark" Style="{StaticResource StealthBtn}" Content="+書籤" ToolTip="在目前閱讀位置新增書籤 (Ctrl+D)，右鍵或進入書庫可檢視書籤清單" Click="BtnAddBookmark_Click" MouseRightButtonUp="BtnAddBookmark_MouseRightButtonUp" />
                         <Button x:Name="BtnPrevChapter" Style="{StaticResource StealthBtn}" Content="◀" ToolTip="上一章 ( [ )" Click="BtnPrevChapter_Click" />
                         <Button x:Name="BtnNextChapter" Style="{StaticResource StealthBtn}" Content="▶" ToolTip="下一章 ( ] )" Click="BtnNextChapter_Click" />
                     </StackPanel>
 
-                    <!-- 中間進度與狀態顯示（可按住拖曳視窗） -->
+                    <!-- 中間進度與狀態顯示（全視窗皆可按住拖曳） -->
                     <TextBlock x:Name="StatusTextBlock"
                                Grid.Column="1"
                                Text="載入中..."
                                FontSize="11"
-                               Margin="8,0"
+                               Margin="6,0"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
-                               ToolTip="按住滑鼠左鍵可任意拖曳視窗；雙擊阅读區可隱藏/顯示此工具列" />
+                               ToolTip="點住視窗任一處（包含小說內文）皆可拖曳移動；雙擊內文可隱藏/顯示此工具列" />
 
                     <!-- 右側偽裝與設定控制 -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnAutoScrollToggle" Style="{StaticResource StealthBtn}" Content="巡航:關" ToolTip="開啟/暫停自動平滑滾動巡航 (F5)" Click="BtnAutoScrollToggle_Click" />
+                        <Button x:Name="BtnCamouflageCycle" Style="{StaticResource StealthBtn}" Content="偽裝:無" ToolTip="循環切換內文偽裝外殼：無 / 系統Log / C#註解 (Ctrl+L)" Click="BtnCamouflageCycle_Click" />
+                        <Button x:Name="BtnGhostClickThrough" Style="{StaticResource StealthBtn}" Content="穿透" ToolTip="開啟滑鼠點擊穿透幽靈模式 (Alt+G 隨時切換，穿透時可用 Alt+J / Alt+K 上下滾動)" Click="BtnGhostClickThrough_Click" />
                         <Button x:Name="BtnAutoHideToggle" Style="{StaticResource StealthBtn}" Content="自動隱形:關" ToolTip="開啟後，滑鼠移開視窗即自動變為 0% 完全透明" Click="BtnAutoHideToggle_Click" />
-                        <Button x:Name="BtnSettings" Style="{StaticResource StealthBtn}" Content="字型/外觀" ToolTip="調整字型、顏色、背景與文字透明度 (Ctrl+,)" Click="BtnSettings_Click" />
-                        <Button x:Name="BtnBossHide" Style="{StaticResource StealthBtn}" Content="隱" ToolTip="瞬間隱藏視窗 (預設老闆鍵 Alt+Q)" Click="BtnBossHide_Click" />
+                        <Button x:Name="BtnSettings" Style="{StaticResource StealthBtn}" Content="設定" ToolTip="調整字型、顏色、雙層透明度、防截圖與老闆鍵模式 (Ctrl+,)" Click="BtnSettings_Click" />
+                        <Button x:Name="BtnBossHide" Style="{StaticResource StealthBtn}" Content="隱" ToolTip="觸發老闆鍵：瞬間隱藏視窗或切換假報錯 StackTrace (預設 Alt+Q)" Click="BtnBossHide_Click" />
                         <Button x:Name="BtnClose" Style="{StaticResource StealthBtn}" Content="✕" ToolTip="儲存進度並關閉程式" Click="BtnClose_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 核心閱讀區（無捲軸、支援任意滾輪手勢與拖曳） -->
+            <!-- 核心閱讀區（無捲軸、支援任意滾輪手勢與任意位置按住拖曳） -->
             <ScrollViewer x:Name="ReaderScrollViewer"
                           Grid.Row="1"
                           VerticalScrollBarVisibility="Hidden"
                           HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly"
                           PreviewMouseWheel="ReaderScrollViewer_PreviewMouseWheel"
-                          ScrollChanged="ReaderScrollViewer_ScrollChanged"
-                          MouseDoubleClick="ReaderScrollViewer_MouseDoubleClick">
+                          ScrollChanged="ReaderScrollViewer_ScrollChanged">
                 <TextBlock x:Name="ReaderTextBlock"
                            TextWrapping="Wrap"
                            Padding="14,6,14,14"
@@ -133,7 +137,7 @@
                            LineHeight="24" />
             </ScrollViewer>
 
-            <!-- 抽屜面板 1：極簡無封面圖書館與章節目錄 (Library & TOC) -->
+            <!-- 抽屜面板 1：極簡圖書館 / 章節目錄 / 書籤管理 / 全書關鍵字搜尋 -->
             <Border x:Name="LibraryDrawer"
                     Grid.Row="0" Grid.RowSpan="2"
                     Background="#F21E1E1E"
@@ -149,24 +153,27 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- 頂部切換列 -->
+                    <!-- 頂部分頁切換列 -->
                     <Grid Grid.Row="0" Margin="0,0,0,6">
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="BtnTabBooks" Style="{StaticResource StealthBtn}" Content="📚 書庫清單" FontWeight="Bold" Click="BtnTabBooks_Click" />
-                            <Button x:Name="BtnTabChapters" Style="{StaticResource StealthBtn}" Content="📑 本書章節 (TOC)" Click="BtnTabChapters_Click" />
-                            <Button x:Name="BtnImportEpub" Style="{StaticResource StealthBtn}" Content="+ 匯入 EPUB" Margin="10,0,2,0" Click="BtnImportEpub_Click" />
-                            <Button x:Name="BtnRemoveBook" Style="{StaticResource StealthBtn}" Content="- 移除選取" Click="BtnRemoveBook_Click" />
+                            <Button x:Name="BtnTabBooks" Style="{StaticResource StealthBtn}" Content="📚 書庫 (Ctrl+B)" FontWeight="Bold" Click="BtnTabBooks_Click" />
+                            <Button x:Name="BtnTabChapters" Style="{StaticResource StealthBtn}" Content="📑 目錄 (Ctrl+T)" Click="BtnTabChapters_Click" />
+                            <Button x:Name="BtnTabBookmarks" Style="{StaticResource StealthBtn}" Content="🔖 書籤 (Ctrl+D)" Click="BtnTabBookmarks_Click" />
+                            <Button x:Name="BtnTabSearch" Style="{StaticResource StealthBtn}" Content="🔍 全書搜尋 (Ctrl+F)" Click="BtnTabSearch_Click" />
+                            <Button x:Name="BtnImportEpub" Style="{StaticResource StealthBtn}" Content="+ 匯入 EPUB" Margin="8,0,2,0" Click="BtnImportEpub_Click" />
+                            <Button x:Name="BtnRemoveItem" Style="{StaticResource StealthBtn}" Content="- 移除選取" Click="BtnRemoveItem_Click" />
                         </StackPanel>
                         <Button Style="{StaticResource StealthBtn}" Content="返回閱讀 (Esc)" HorizontalAlignment="Right" Click="BtnCloseDrawer_Click" />
                     </Grid>
 
-                    <!-- 關鍵字即時過濾 -->
+                    <!-- 關鍵字搜尋 / 篩選輸入列 -->
                     <Grid Grid.Row="1" Margin="0,0,0,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="搜尋：" Foreground="#BBBBBB" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0" />
+                        <TextBlock x:Name="SearchPromptText" Text="篩選 / 搜尋：" Foreground="#BBBBBB" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0" />
                         <TextBox x:Name="SearchBox"
                                  Grid.Column="1"
                                  Background="#2A2D2E"
@@ -174,17 +181,26 @@
                                  BorderBrush="#44888888"
                                  Padding="4,2"
                                  FontSize="12"
-                                 TextChanged="SearchBox_TextChanged" />
+                                 TextChanged="SearchBox_TextChanged"
+                                 KeyDown="SearchBox_KeyDown" />
+                        <Button x:Name="BtnExecuteBookSearch"
+                                Grid.Column="2"
+                                Style="{StaticResource StealthBtn}"
+                                Content="搜尋全書"
+                                Margin="6,0,0,0"
+                                Padding="8,2"
+                                Visibility="Collapsed"
+                                Click="BtnExecuteBookSearch_Click" />
                     </Grid>
 
-                    <!-- 書庫清單 ListBox -->
+                    <!-- 1. 書庫清單 ListBox -->
                     <ListBox x:Name="BooksListBox"
                              Grid.Row="2"
                              Background="#181818"
                              Foreground="#CCCCCC"
                              BorderBrush="#33888888"
-                             MouseDoubleClick="BooksListBox_MouseDoubleClick"
-                             KeyDown="BooksListBox_KeyDown">
+                             MouseDoubleClick="DrawerListBox_MouseDoubleClick"
+                             KeyDown="DrawerListBox_KeyDown">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="2,3">
@@ -205,15 +221,15 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- 章節目錄 ListBox -->
+                    <!-- 2. 章節目錄 ListBox -->
                     <ListBox x:Name="ChaptersListBox"
                              Grid.Row="2"
                              Background="#181818"
                              Foreground="#CCCCCC"
                              BorderBrush="#33888888"
                              Visibility="Collapsed"
-                             MouseDoubleClick="ChaptersListBox_MouseDoubleClick"
-                             KeyDown="ChaptersListBox_KeyDown">
+                             MouseDoubleClick="DrawerListBox_MouseDoubleClick"
+                             KeyDown="DrawerListBox_KeyDown">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Title}" Padding="2,2" Foreground="#CCCCCC" />
@@ -221,16 +237,61 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
+                    <!-- 3. 書籤清單 ListBox -->
+                    <ListBox x:Name="BookmarksListBox"
+                             Grid.Row="2"
+                             Background="#181818"
+                             Foreground="#CCCCCC"
+                             BorderBrush="#33888888"
+                             Visibility="Collapsed"
+                             MouseDoubleClick="DrawerListBox_MouseDoubleClick"
+                             KeyDown="DrawerListBox_KeyDown">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding PositionDisplay}" Foreground="#6A9955" FontSize="11" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Snippet}" Foreground="#CCCCCC" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding TimeDisplay}" Foreground="#666666" FontSize="11" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- 4. 全書搜尋結果 ListBox -->
+                    <ListBox x:Name="SearchResultsListBox"
+                             Grid.Row="2"
+                             Background="#181818"
+                             Foreground="#CCCCCC"
+                             BorderBrush="#33888888"
+                             Visibility="Collapsed"
+                             MouseDoubleClick="DrawerListBox_MouseDoubleClick"
+                             KeyDown="DrawerListBox_KeyDown">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2,3">
+                                    <TextBlock Text="{Binding LocationDisplay}" Foreground="#6A9955" FontSize="11" />
+                                    <TextBlock Text="{Binding Snippet}" Foreground="#CCCCCC" TextWrapping="Wrap" FontSize="12" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
                     <!-- 底部操作提示 -->
                     <DockPanel Grid.Row="3" Margin="0,6,0,0">
-                        <TextBlock Text="提示：雙擊項目或按 Enter 立即切換；亦可直接把 .epub 檔案拖曳進視窗匯入。"
+                        <TextBlock x:Name="DrawerFooterHint"
+                                   Text="提示：雙擊項目或按 Enter 立即跳轉；在閱讀時按 Ctrl+D 可快速新增書籤。"
                                    Foreground="#888888" FontSize="11" VerticalAlignment="Center" />
-                        <Button Style="{StaticResource StealthBtn}" Content="切換至選取項目" HorizontalAlignment="Right" Click="BtnConfirmSelection_Click" />
+                        <Button Style="{StaticResource StealthBtn}" Content="跳轉至選取項目" HorizontalAlignment="Right" Click="BtnConfirmSelection_Click" />
                     </DockPanel>
                 </Grid>
             </Border>
 
-            <!-- 抽屜面板 2：字型、雙層透明度與保護色設定 (Appearance & Stealth Settings) -->
+            <!-- 抽屜面板 2：字型、雙層透明度、偽裝外殼與防抓包設定 -->
             <Border x:Name="SettingsDrawer"
                     Grid.Row="0" Grid.RowSpan="2"
                     Background="#F51E1E1E"
@@ -245,7 +306,7 @@
                     </Grid.RowDefinitions>
 
                     <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                        <TextBlock Text="⚙ 外觀、字型、雙層透明度與防抓包設定" Foreground="#CCCCCC" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="⚙ 外觀、字型、雙層透明度与終極防抓包設定" Foreground="#CCCCCC" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" />
                         <Button Style="{StaticResource StealthBtn}" Content="完成返回 (Esc)" HorizontalAlignment="Right" Click="BtnCloseDrawer_Click" />
                     </DockPanel>
 
@@ -281,7 +342,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="75" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="75" />
+                                    <ColumnDefinition Width="85" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="行距倍數：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
@@ -289,10 +350,10 @@
                                     <TextBlock x:Name="LineHeightValueText" Text="1.6x" Foreground="#CCCCCC" FontSize="11" Width="34" DockPanel.Dock="Right" TextAlignment="Right" />
                                     <Slider x:Name="LineHeightSlider" Minimum="1.1" Maximum="2.6" SmallChange="0.05" LargeChange="0.2" ValueChanged="LineHeightSlider_ValueChanged" />
                                 </DockPanel>
-                                <TextBlock Grid.Column="2" Text="  滾輪步進：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="  自動巡航速度：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
                                 <DockPanel Grid.Column="3" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ScrollStepValueText" Text="48px" Foreground="#CCCCCC" FontSize="11" Width="38" DockPanel.Dock="Right" TextAlignment="Right" />
-                                    <Slider x:Name="ScrollStepSlider" Minimum="16" Maximum="160" SmallChange="8" LargeChange="24" ValueChanged="ScrollStepSlider_ValueChanged" />
+                                    <TextBlock x:Name="AutoScrollSpeedValueText" Text="22px/s" Foreground="#CCCCCC" FontSize="11" Width="44" DockPanel.Dock="Right" TextAlignment="Right" />
+                                    <Slider x:Name="AutoScrollSpeedSlider" Minimum="5" Maximum="120" SmallChange="2" LargeChange="10" ValueChanged="AutoScrollSpeedSlider_ValueChanged" />
                                 </DockPanel>
                             </Grid>
 
@@ -320,15 +381,15 @@
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="85" />
-                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="80" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="85" />
-                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="80" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="背景色 HEX：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
                                 <TextBox x:Name="BgHexBox" Grid.Column="1" Background="#2A2D2E" Foreground="#DDDDDD" BorderBrush="#44888888" Padding="4,2" FontSize="11" LostFocus="ColorHexBox_LostFocus" KeyDown="ColorHexBox_KeyDown" />
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,10,0">
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,8,0">
                                     <Button Style="{StaticResource StealthBtn}" Content="深灰" Tag="#1E1E1E" Click="QuickBgColor_Click" />
                                     <Button Style="{StaticResource StealthBtn}" Content="純黑" Tag="#0D0D0D" Click="QuickBgColor_Click" />
                                     <Button Style="{StaticResource StealthBtn}" Content="純白" Tag="#FFFFFF" Click="QuickBgColor_Click" />
@@ -343,18 +404,43 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- 4. 防抓包與老闆鍵設定 -->
-                            <TextBlock Text="【防抓包與全域老闆鍵】" Foreground="#9CDCFE" FontSize="11" Margin="0,2,0,4" />
-                            <WrapPanel VerticalAlignment="Center" Margin="0,0,0,4">
-                                <TextBlock Text="全域老闆鍵：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                <ComboBox x:Name="BossKeyCombo" Width="100" Height="22" FontSize="11" Margin="0,0,14,0" SelectionChanged="BossKeyCombo_SelectionChanged" />
-                                <CheckBox x:Name="AutoHideCheckBox" Content="滑鼠移開視窗自動 0% 透明隱形" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,0" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
-                                <CheckBox x:Name="TopmostCheckBox" Content="視窗永遠置頂" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,0" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
-                                <CheckBox x:Name="HideAltTabCheckBox" Content="從 Alt+Tab 清單中隱藏" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
+                            <!-- 4. 終極防抓包黑科技與老闆鍵設定 -->
+                            <TextBlock Text="【終極防抓包黑科技：防截圖分享 / 內文偽裝外殼 / 老闆鍵假報錯】" Foreground="#9CDCFE" FontSize="11" Margin="0,2,0,4" />
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="75" />
+                                    <ColumnDefinition Width="95" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="內文偽裝外殼：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
+                                <ComboBox x:Name="CamouflageModeCombo" Grid.Column="1" Height="22" FontSize="11" Margin="0,0,8,0" SelectionChanged="CamouflageModeCombo_SelectionChanged">
+                                    <ComboBoxItem Content="無偽裝 (純小說)" Tag="None" />
+                                    <ComboBoxItem Content="系統 Log 日誌外殼" Tag="SystemLog" />
+                                    <ComboBoxItem Content="C# 程式碼註解外殼" Tag="CSharpCode" />
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="2" Text="老闆鍵動作：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
+                                <ComboBox x:Name="BossKeyActionCombo" Grid.Column="3" Height="22" FontSize="11" Margin="0,0,8,0" SelectionChanged="BossKeyActionCombo_SelectionChanged">
+                                    <ComboBoxItem Content="瞬間隱藏視窗" Tag="HideWindow" />
+                                    <ComboBoxItem Content="切換假報錯 StackTrace" Tag="FakeException" />
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="4" Text="老闆鍵熱鍵：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
+                                <ComboBox x:Name="BossKeyCombo" Grid.Column="5" Height="22" FontSize="11" SelectionChanged="BossKeyCombo_SelectionChanged" />
+                            </Grid>
+
+                            <WrapPanel VerticalAlignment="Center" Margin="0,2,0,4">
+                                <CheckBox x:Name="ExcludeCaptureCheckBox" Content="防截圖 / 防螢幕分享曝光 (Teams/Zoom 分享桌面時完全隱形)" Foreground="#6A9955" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
+                                <CheckBox x:Name="AutoHideCheckBox" Content="滑鼠移開視窗自動 0% 透明隱形" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
+                                <CheckBox x:Name="TopmostCheckBox" Content="視窗永遠置頂" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
+                                <CheckBox x:Name="HideAltTabCheckBox" Content="從 Alt+Tab 清單中隱藏" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,0,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
                             </WrapPanel>
 
-                            <TextBlock Text="快捷鍵總覽：[Alt+Q] 老闆鍵瞬隱/喚醒 · [Ctrl+滾輪] 縮放字體 · [Alt+滾輪] 調整文字透明度 · [Shift+滾輪] 調整背景透明度 · [上下鍵/滾輪] 逐行捲動 · [左右鍵/空白鍵] 翻頁與跨章 · [雙擊內文] 隱藏頂部微工具列"
-                                       Foreground="#777777" FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            <TextBlock Text="快捷鍵總覽：[Alt+Q] 老闆鍵(瞬隱或假報錯) · [Alt+G] 滑鼠點擊穿透幽靈模式 · [Alt+J / Alt+K] 穿透時全域上下捲動 · [Ctrl+L] 切換Log/C#偽裝外殼 · [F5] 自動滾動巡航 · [Ctrl+F] 全書搜尋 · [Ctrl+D] 加入書籤 · [Ctrl/Alt/Shift+滾輪] 縮放字級/文字透明/背景透明"
+                                       Foreground="#777777" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" />
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

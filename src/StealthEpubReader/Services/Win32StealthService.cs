@@ -9,10 +9,19 @@ namespace StealthEpubReader.Services;
 public class Win32StealthService : IDisposable
 {
     private const int WM_HOTKEY = 0x0312;
-    private const int HOTKEY_ID = 0x9527;
+
+    private const int HOTKEY_BOSS_ID = 0x9527;
+    private const int HOTKEY_GHOST_ID = 0x9528; // Alt+G: 切換滑鼠穿透
+    private const int HOTKEY_NEXT_ID = 0x9529;  // Alt+J: 全域無焦點向下滾動
+    private const int HOTKEY_PREV_ID = 0x952A;  // Alt+K: 全域無焦點向上滾動
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
+    private const int WS_EX_LAYERED = 0x00080000;
+
+    private const uint WDA_NONE = 0x00000000;
+    private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
@@ -31,12 +40,21 @@ public class Win32StealthService : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
     private IntPtr _windowHandle;
     private HwndSource? _hwndSource;
     private NotifyIcon? _notifyIcon;
     private Icon? _generatedTrayIcon;
 
+    public bool IsClickThroughEnabled { get; private set; }
+
     public event Action? BossKeyTriggered;
+    public event Action? GhostModeToggleTriggered;
+    public event Action? GlobalScrollDownTriggered;
+    public event Action? GlobalScrollUpTriggered;
+
     public event Action? TrayToggleVisibilityRequested;
     public event Action? TrayOpenLibraryRequested;
     public event Action? TrayOpenSettingsRequested;
@@ -52,7 +70,7 @@ public class Win32StealthService : IDisposable
         "F9"
     };
 
-    public void Initialize(Window window, string bossKeyGesture, bool hideFromAltTab)
+    public void Initialize(Window window, string bossKeyGesture, bool hideFromAltTab, bool excludeFromCapture)
     {
         var helper = new WindowInteropHelper(window);
         _windowHandle = helper.EnsureHandle();
@@ -60,7 +78,9 @@ public class Win32StealthService : IDisposable
         _hwndSource?.AddHook(WndProc);
 
         SetHideFromAltTab(hideFromAltTab);
+        SetExcludeFromCapture(excludeFromCapture);
         RegisterBossKey(bossKeyGesture);
+        RegisterAuxiliaryHotKeys();
         InitializeSystemTray();
     }
 
@@ -68,23 +88,66 @@ public class Win32StealthService : IDisposable
     {
         if (_windowHandle == IntPtr.Zero) return false;
 
-        UnregisterHotKey(_windowHandle, HOTKEY_ID);
+        UnregisterHotKey(_windowHandle, HOTKEY_BOSS_ID);
 
         var (modifiers, vk) = ParseBossKeyGesture(gesture);
-        return RegisterHotKey(_windowHandle, HOTKEY_ID, modifiers | MOD_NOREPEAT, vk);
+        return RegisterHotKey(_windowHandle, HOTKEY_BOSS_ID, modifiers | MOD_NOREPEAT, vk);
+    }
+
+    private void RegisterAuxiliaryHotKeys()
+    {
+        if (_windowHandle == IntPtr.Zero) return;
+
+        // Alt+G (0x47): 切換滑鼠穿透幽靈模式
+        RegisterHotKey(_windowHandle, HOTKEY_GHOST_ID, MOD_ALT | MOD_NOREPEAT, 0x47);
+        // Alt+J (0x4A): 全域無焦點向下滾動
+        RegisterHotKey(_windowHandle, HOTKEY_NEXT_ID, MOD_ALT, 0x4A);
+        // Alt+K (0x4B): 全域無焦點向上滾動
+        RegisterHotKey(_windowHandle, HOTKEY_PREV_ID, MOD_ALT, 0x4B);
     }
 
     private static (uint Modifiers, uint Vk) ParseBossKeyGesture(string gesture)
     {
         return gesture switch
         {
-            "Alt+W" => (MOD_ALT, 0x57),        // 'W'
-            "Alt+Z" => (MOD_ALT, 0x5A),        // 'Z'
-            "Alt+Space" => (MOD_ALT, 0x20),    // VK_SPACE
+            "Alt+W" => (MOD_ALT, 0x57),
+            "Alt+Z" => (MOD_ALT, 0x5A),
+            "Alt+Space" => (MOD_ALT, 0x20),
             "Ctrl+Space" => (MOD_CONTROL, 0x20),
-            "F9" => (0, 0x78),                 // VK_F9
-            _ => (MOD_ALT, 0x51)               // Default: Alt+Q ('Q')
+            "F9" => (0, 0x78),
+            _ => (MOD_ALT, 0x51) // Default: Alt+Q ('Q')
         };
+    }
+
+    /// <summary>
+    /// 防截圖與防螢幕分享曝光 (WDA_EXCLUDEFROMCAPTURE)
+    /// 開啟後，Teams / Zoom / OBS / 截圖工具將完全拍不到此視窗！
+    /// </summary>
+    public bool SetExcludeFromCapture(bool exclude)
+    {
+        if (_windowHandle == IntPtr.Zero) return false;
+        return SetWindowDisplayAffinity(_windowHandle, exclude ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
+    }
+
+    /// <summary>
+    /// 滑鼠點擊穿透幽靈模式 (WS_EX_TRANSPARENT)
+    /// 開啟後滑鼠點擊與滾輪直接穿透到底層 Excel / VS Code
+    /// </summary>
+    public void SetClickThrough(bool enable)
+    {
+        if (_windowHandle == IntPtr.Zero) return;
+        IsClickThroughEnabled = enable;
+
+        int exStyle = GetWindowLong(_windowHandle, GWL_EXSTYLE);
+        if (enable)
+        {
+            exStyle |= WS_EX_TRANSPARENT | WS_EX_LAYERED;
+        }
+        else
+        {
+            exStyle &= ~WS_EX_TRANSPARENT;
+        }
+        SetWindowLong(_windowHandle, GWL_EXSTYLE, exStyle);
     }
 
     public void SetHideFromAltTab(bool hide)
@@ -108,16 +171,17 @@ public class Win32StealthService : IDisposable
         _generatedTrayIcon = CreateLowProfileTrayIcon();
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("顯示 / 隱藏閱讀器 (老闆鍵)", null, (_, _) => TrayToggleVisibilityRequested?.Invoke());
-        menu.Items.Add("開啟極簡圖書館 (Ctrl+B)", null, (_, _) => TrayOpenLibraryRequested?.Invoke());
-        menu.Items.Add("外觀與字型設定 (Ctrl+,)", null, (_, _) => TrayOpenSettingsRequested?.Invoke());
+        menu.Items.Add("顯示 / 隱藏閱讀器 (老闆鍵 Alt+Q)", null, (_, _) => TrayToggleVisibilityRequested?.Invoke());
+        menu.Items.Add("切換滑鼠穿透幽靈模式 (Alt+G)", null, (_, _) => GhostModeToggleTriggered?.Invoke());
+        menu.Items.Add("開啟極簡圖書館 / 搜尋 / 書籤 (Ctrl+B)", null, (_, _) => TrayOpenLibraryRequested?.Invoke());
+        menu.Items.Add("外觀、字型與防抓包設定 (Ctrl+,)", null, (_, _) => TrayOpenSettingsRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("儲存並結束", null, (_, _) => TrayExitRequested?.Invoke());
 
         _notifyIcon = new NotifyIcon
         {
             Icon = _generatedTrayIcon,
-            Text = "System Background Host (Alt+Q)", // 低調偽裝提示名稱
+            Text = "System Background Host (Alt+Q)",
             Visible = true,
             ContextMenuStrip = menu
         };
@@ -131,9 +195,6 @@ public class Win32StealthService : IDisposable
         };
     }
 
-    /// <summary>
-    /// 動態繪製一個極低調的深灰色終端機小圖示，避免系統匣出現顯眼的書本圖案
-    /// </summary>
     private static Icon CreateLowProfileTrayIcon()
     {
         using var bmp = new Bitmap(16, 16);
@@ -146,7 +207,6 @@ public class Win32StealthService : IDisposable
 
         g.FillRectangle(bgBrush, 1, 2, 13, 11);
         g.DrawRectangle(borderPen, 1, 2, 13, 11);
-        // 繪製類似 ">_" 的終端機符號
         g.FillRectangle(textBrush, 4, 6, 3, 2);
         g.FillRectangle(textBrush, 8, 9, 4, 2);
 
@@ -156,10 +216,29 @@ public class Win32StealthService : IDisposable
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+        if (msg == WM_HOTKEY)
         {
-            handled = true;
-            BossKeyTriggered?.Invoke();
+            int id = wParam.ToInt32();
+            if (id == HOTKEY_BOSS_ID)
+            {
+                handled = true;
+                BossKeyTriggered?.Invoke();
+            }
+            else if (id == HOTKEY_GHOST_ID)
+            {
+                handled = true;
+                GhostModeToggleTriggered?.Invoke();
+            }
+            else if (id == HOTKEY_NEXT_ID)
+            {
+                handled = true;
+                GlobalScrollDownTriggered?.Invoke();
+            }
+            else if (id == HOTKEY_PREV_ID)
+            {
+                handled = true;
+                GlobalScrollUpTriggered?.Invoke();
+            }
         }
         return IntPtr.Zero;
     }
@@ -168,7 +247,10 @@ public class Win32StealthService : IDisposable
     {
         if (_windowHandle != IntPtr.Zero)
         {
-            UnregisterHotKey(_windowHandle, HOTKEY_ID);
+            UnregisterHotKey(_windowHandle, HOTKEY_BOSS_ID);
+            UnregisterHotKey(_windowHandle, HOTKEY_GHOST_ID);
+            UnregisterHotKey(_windowHandle, HOTKEY_NEXT_ID);
+            UnregisterHotKey(_windowHandle, HOTKEY_PREV_ID);
         }
         if (_hwndSource != null)
         {

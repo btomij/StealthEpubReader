@@ -1,0 +1,37 @@
+# epub-engine Specification
+
+## Purpose
+TBD - created by archiving change init-stealth-epub-reader. Update Purpose after archive.
+## Requirements
+### Requirement: 章節懶加載與鄰近章節預載快取
+The system SHALL 採用按需載入機制解析 EPUB 檔案，僅在需要時提取當前章節 XHTML 轉為輕量純文字段落模型，並在背景自動預載（Pre-fetch）上一章與下一章至記憶體快取中，確保切換章節零卡頓。
+
+#### Scenario: 開啟大型 EPUB 並切換下一章
+- **WHEN** 使用者開啟一本包含數百章節的 EPUB 書籍並切換至下一章
+- **THEN** 系統直接從記憶體快取讀取已預載之章節內容，於毫秒級內完成渲染且 UI 執行緒不發生阻塞
+
+### Requirement: 預設過濾圖片之純文字防穿幫排版
+The system SHALL 預設過濾並忽略 EPUB 章節中的 `<img>` 與 `<svg>` 圖片標籤，僅渲染結構化文字段落與標題，避免翻頁時突然跳出大型插圖或封面導致曝光。
+
+#### Scenario: 閱讀含有插圖的章節
+- **WHEN** 使用者載入含有插圖或封面的 EPUB 章節
+- **THEN** 閱讀器僅乾淨呈現文字段落，不顯示任何圖片元素
+
+### Requirement: 滾輪上下鍵捲動與左右鍵翻頁雙模式操作
+The system SHALL 同時支援「滑鼠滾輪 / 上下方向鍵逐行平滑捲動」以及「左右方向鍵（或 PageUp/PageDown）快速翻頁与跨章節切換」，當捲動至章節底部或頂部繼續翻頁時支援無縫切換上下章。
+
+#### Scenario: 使用滾輪與上下鍵捲動閱讀
+- **WHEN** 使用者在閱讀區域滾動滑鼠滾輪或按上下方向鍵
+- **THEN** 閱讀內容依設定步進平滑上下移動
+
+#### Scenario: 使用左右鍵或翻至章節末尾切換
+- **WHEN** 使用者按下右方向鍵（翻下一屏/下一章）或在章節底部繼續向下翻頁
+- **THEN** 閱讀器自動切換至下一屏或無縫載入下一章開頭
+
+### Requirement: 輕量目錄 (TOC) 快速跳轉
+The system SHALL 解析 EPUB 的導航目錄（NCX / Navigation Document）或閱讀順序清單（Spine），提供極簡目錄抽屜供使用者搜尋並點擊跳轉至任意章節。
+
+#### Scenario: 從目錄跳轉指定章節
+- **WHEN** 使用者開啟目錄面板並點選目標章節
+- **THEN** 閱讀器立即載入該章節並將捲動位置重置於章節開頭
+

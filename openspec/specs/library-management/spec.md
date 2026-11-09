@@ -1,0 +1,26 @@
+# library-management Specification
+
+## Purpose
+TBD - created by archiving change init-stealth-epub-reader. Update Purpose after archive.
+## Requirements
+### Requirement: 極簡無封面圖書館清單與搜尋
+The system SHALL 提供不顯示書籍封面的純文字極簡圖書館面板（可透過快捷鍵 `Ctrl+B` 或工具列開啟），列出書庫內所有書籍之書名、作者、當前章節、整體進度百分比及最後閱讀時間，並支援關鍵字即時篩選。
+
+#### Scenario: 開啟極簡圖書館檢視藏書與進度
+- **WHEN** 使用者按下 `Ctrl+B` 或點擊圖書館按鈕
+- **THEN** 系統顯示與當前保護色主題一致的純文字書單面板，列出所有已匯入書籍及其閱讀進度 `%`
+
+### Requirement: 支援拖放與檔案選擇匯入 EPUB
+The system SHALL 支援將一個或多個 `.epub` 檔案直接拖放（Drag & Drop）至閱讀器視窗或透過檔案對話框匯入書庫，自動解析書名、作者與總章節數並加入圖書館。
+
+#### Scenario: 拖放 EPUB 檔案至閱讀視窗
+- **WHEN** 使用者從檔案總管將 `.epub` 檔案拖曳並放開於閱讀器視窗上
+- **THEN** 系統自動將該書加入書庫並立即切換開始閱讀該書
+
+### Requirement: 一鍵毫秒級切書與書籍移除
+The system SHALL 允許使用者在圖書館清單中點選任意書籍以立即切換閱讀，並提供從書庫移除紀錄（不刪除原始檔案）的功能。
+
+#### Scenario: 點選圖書館中另一本書進行切換
+- **WHEN** 使用者在圖書館清單中點擊另一本已匯入的書籍
+- **THEN** 系統先自動保存當前書籍進度，接著於毫秒級內載入目標書籍並恢復其上次閱讀位置
+

@@ -1,0 +1,41 @@
+# stealth-window Specification
+
+## Purpose
+TBD - created by archiving change init-stealth-epub-reader. Update Purpose after archive.
+## Requirements
+### Requirement: 無邊框偽裝視窗與全視窗任意位置拖曳縮放
+The system SHALL 提供無系統標題列與無傳統邊框的極簡閱讀視窗 (`WindowStyle="None"`, `AllowsTransparency="True"`)，並允許使用者在視窗內任一非互動按鈕區域（包含內文閱讀區、空白處與狀態列，不限於頂部標題列）按住滑鼠左鍵直接拖曳移動視窗，以及調整視窗為任意尺寸（包含單行狀態列模式或區塊模式）。
+
+#### Scenario: 點住閱讀內文或視窗任一位置拖曳移動與縮放
+- **WHEN** 使用者在閱讀區內文或視窗任意位置按住滑鼠左鍵拖曳（即使頂部工具列已隱藏），或調整視窗邊緣高度至單行文字高度
+- **THEN** 視窗立即跟隨滑鼠平滑移動且不限於標題列，縮放時文字自動重新排版適應寬度且無白底閃爍
+
+### Requirement: 全域老闆鍵瞬隱與喚醒
+The system SHALL 透過 Win32 `RegisterHotKey` 註冊全域老闆鍵（預設 `Alt+Q`，可自訂），在任何前景程式下觸發時 MUST 於毫秒級內隱藏或喚醒閱讀器視窗。
+
+#### Scenario: 按下全域老闆鍵瞬間隱藏
+- **WHEN** 閱讀器處於顯示狀態且使用者在任何視窗按下 `Alt+Q`
+- **THEN** 系統立即隱藏閱讀器視窗、觸發閱讀進度存檔，且不產生視窗最小化動畫
+
+#### Scenario: 按下全域老闆鍵瞬間喚醒
+- **WHEN** 閱讀器處於隱藏狀態且使用者按下 `Alt+Q`
+- **THEN** 系統立即恢復顯示閱讀器視窗並還原至隱藏前的精確位置與閱讀進度
+
+### Requirement: 低調系統匣圖示與工作列隱藏
+The system SHALL 預設隱藏 Windows 工作列圖示 (`ShowInTaskbar="False"`)，並在系統匣 (System Tray) 提供低調圖示與右鍵選單（支援顯示/隱藏、開啟圖書館、切換滑鼠離開自動透明、結束程式）。
+
+#### Scenario: 工作列不顯示閱讀器圖示
+- **WHEN** 閱讀器啟動並處於閱讀狀態
+- **THEN** Windows 下方工作列不出現閱讀器圖示，且使用者可從系統匣圖示喚醒或控制應用程式
+
+### Requirement: 滑鼠離開自動透明（Auto-Stealth）
+The system SHALL 提供「滑鼠移開自動透明」開關；啟用時，當滑鼠游標離開閱讀器視窗範圍，視窗 MUST 立即將整體不透明度降為近乎完全隱形（或 0%），當滑鼠移入時立即恢復設定的不透明度。
+
+#### Scenario: 啟用滑鼠離開自動透明並移開游標
+- **WHEN** 使用者已開啟「滑鼠移開自動透明」功能，且將滑鼠游標移出閱讀器視窗邊界
+- **THEN** 閱讀器視窗與文字立即變為完全透明隱形
+
+#### Scenario: 滑鼠重新移入恢復顯示
+- **WHEN** 閱讀器因滑鼠離開而處於自動透明狀態，且使用者將滑鼠游標移回視窗範圍內
+- **THEN** 閱讀器立即恢復使用者設定的背景與文字透明度
+
