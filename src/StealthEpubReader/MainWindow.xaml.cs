@@ -39,6 +39,8 @@ public partial class MainWindow : Window
     private bool _isInitializing = true;
     private bool _isRestoringScroll = false;
     private bool _isPanicFakeScreenActive = false;
+    private bool _leftClickPending = false;
+    private System.Windows.Point _leftDownPoint;
     private double _savedPanicScrollOffset = 0.0;
     private double? _savedCompactHeight;
 
@@ -480,28 +482,66 @@ public partial class MainWindow : Window
 
     #endregion
 
-    #region 全視窗拖曳、滾輪、翻頁與快捷鍵控制
+    #region 全視窗拖曳、左鍵下一頁/右鍵上一頁、滾輪與快捷鍵控制
+
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // 點擊滑鼠中鍵（滾輪鍵）：快速切換隱藏/顯示頂部微型工具列
+        if (e.ChangedButton == MouseButton.Middle &&
+            LibraryDrawer.Visibility != Visibility.Visible &&
+            SettingsDrawer.Visibility != Visibility.Visible)
+        {
+            e.Handled = true;
+            ToggleMiniStatusBar();
+        }
+    }
+
+    private void ToggleMiniStatusBar()
+    {
+        _storage.Settings.ShowMiniStatusBar = !_storage.Settings.ShowMiniStatusBar;
+        TopMicroBar.Visibility = _storage.Settings.ShowMiniStatusBar ? Visibility.Visible : Visibility.Collapsed;
+        _storage.ScheduleSave();
+    }
 
     private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (IsInteractiveControl(e.OriginalSource as DependencyObject))
         {
+            _leftClickPending = false;
             return;
         }
 
-        if (e.ClickCount == 2 &&
-            LibraryDrawer.Visibility != Visibility.Visible &&
-            SettingsDrawer.Visibility != Visibility.Visible)
+        // 若在抽屜面板空白處按住左鍵，直接拖曳視窗
+        if (LibraryDrawer.Visibility == Visibility.Visible || SettingsDrawer.Visibility == Visibility.Visible)
         {
-            e.Handled = true;
-            _storage.Settings.ShowMiniStatusBar = !_storage.Settings.ShowMiniStatusBar;
-            TopMicroBar.Visibility = _storage.Settings.ShowMiniStatusBar ? Visibility.Visible : Visibility.Collapsed;
-            _storage.ScheduleSave();
+            _leftClickPending = false;
+            if (e.ButtonState == MouseButtonState.Pressed)
+            {
+                try { DragMove(); } catch { }
+            }
             return;
         }
 
-        if (e.ButtonState == MouseButtonState.Pressed)
+        // 記錄按下座標：若按住移動超過 4px 則轉為拖曳視窗；若原地放開則觸發「左鍵 -> 下一頁」
+        _leftClickPending = true;
+        _leftDownPoint = e.GetPosition(this);
+    }
+
+    private void Window_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_leftClickPending) return;
+
+        if (e.LeftButton != MouseButtonState.Pressed)
         {
+            _leftClickPending = false;
+            return;
+        }
+
+        var currentPos = e.GetPosition(this);
+        if (Math.Abs(currentPos.X - _leftDownPoint.X) > 4.0 ||
+            Math.Abs(currentPos.Y - _leftDownPoint.Y) > 4.0)
+        {
+            _leftClickPending = false;
             try
             {
                 DragMove();
@@ -509,6 +549,72 @@ public partial class MainWindow : Window
             catch
             {
                 // Ignore if mouse released mid-drag
+            }
+        }
+    }
+
+    private async void Window_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_leftClickPending) return;
+        _leftClickPending = false;
+
+        if (LibraryDrawer.Visibility == Visibility.Visible ||
+            SettingsDrawer.Visibility == Visibility.Visible ||
+            IsInteractiveControl(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        // 滑鼠左鍵單擊（未拖曳）-> 下一頁
+        e.Handled = true;
+        await PageTurnOrNextChapterAsync(forward: true);
+    }
+
+    private async void Window_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (LibraryDrawer.Visibility == Visibility.Visible ||
+            SettingsDrawer.Visibility == Visibility.Visible ||
+            IsInteractiveControl(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        // 滑鼠右鍵單擊 -> 上一頁
+        e.Handled = true;
+        await PageTurnOrNextChapterAsync(forward: false);
+    }
+
+    private async Task PageTurnOrNextChapterAsync(bool forward)
+    {
+        double step = _storage.Settings.ScrollStepPixels;
+        double pageStep = Math.Max(step, ReaderScrollViewer.ViewportHeight * 0.85);
+
+        if (forward)
+        {
+            if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset >= ReaderScrollViewer.ScrollableHeight - 1.0)
+            {
+                if (_currentBook != null && _currentBook.CurrentChapterIndex < _epubEngine.TotalChapters - 1)
+                {
+                    await LoadChapterAsync(_currentBook.CurrentChapterIndex + 1, 0.0);
+                }
+            }
+            else
+            {
+                ReaderScrollViewer.ScrollToVerticalOffset(ReaderScrollViewer.VerticalOffset + pageStep);
+            }
+        }
+        else
+        {
+            if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset <= 1.0)
+            {
+                if (_currentBook != null && _currentBook.CurrentChapterIndex > 0)
+                {
+                    await LoadChapterAsync(_currentBook.CurrentChapterIndex - 1, 1.0);
+                }
+            }
+            else
+            {
+                ReaderScrollViewer.ScrollToVerticalOffset(Math.Max(0, ReaderScrollViewer.VerticalOffset - pageStep));
             }
         }
     }
@@ -733,6 +839,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.F11)
+        {
+            e.Handled = true;
+            ToggleMiniStatusBar();
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             e.Handled = true;
@@ -752,9 +865,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        double step = _storage.Settings.ScrollStepPixels;
-        double pageStep = Math.Max(step, ReaderScrollViewer.ViewportHeight * 0.85);
-
         switch (e.Key)
         {
             case Key.Down:
@@ -773,33 +883,13 @@ public partial class MainWindow : Window
             case Key.PageDown:
             case Key.Space:
                 e.Handled = true;
-                if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset >= ReaderScrollViewer.ScrollableHeight - 1.0)
-                {
-                    if (_currentBook != null && _currentBook.CurrentChapterIndex < _epubEngine.TotalChapters - 1)
-                    {
-                        await LoadChapterAsync(_currentBook.CurrentChapterIndex + 1, 0.0);
-                    }
-                }
-                else
-                {
-                    ReaderScrollViewer.ScrollToVerticalOffset(ReaderScrollViewer.VerticalOffset + pageStep);
-                }
+                await PageTurnOrNextChapterAsync(forward: true);
                 break;
 
             case Key.Left:
             case Key.PageUp:
                 e.Handled = true;
-                if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset <= 1.0)
-                {
-                    if (_currentBook != null && _currentBook.CurrentChapterIndex > 0)
-                    {
-                        await LoadChapterAsync(_currentBook.CurrentChapterIndex - 1, 1.0);
-                    }
-                }
-                else
-                {
-                    ReaderScrollViewer.ScrollToVerticalOffset(Math.Max(0, ReaderScrollViewer.VerticalOffset - pageStep));
-                }
+                await PageTurnOrNextChapterAsync(forward: false);
                 break;
 
             case Key.OemOpenBrackets:
