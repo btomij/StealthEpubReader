@@ -28,10 +28,13 @@ public class AppSettings
     public double AutoScrollSpeed { get; set; } = 22.0; // 每秒自動捲動像素數
     public bool ShowMiniStatusBar { get; set; } = true;
 
+    // 書庫存放目錄設定（空白代表預設程式目錄下 data/books）
+    public string CustomBooksDirectory { get; set; } = string.Empty;
+
     // 視窗位置與尺寸記憶
     public double WindowLeft { get; set; } = 160.0;
     public double WindowTop { get; set; } = 540.0;
-    public double WindowWidth { get; set; } = 660.0;
+    public double WindowWidth { get; set; } = 680.0;
     public double WindowHeight { get; set; } = 220.0;
 
     // 上次開啟的書籍 ID

@@ -432,12 +432,35 @@
                                 <ComboBox x:Name="BossKeyCombo" Grid.Column="5" Height="22" FontSize="11" SelectionChanged="BossKeyCombo_SelectionChanged" />
                             </Grid>
 
-                            <WrapPanel VerticalAlignment="Center" Margin="0,2,0,4">
+                            <WrapPanel VerticalAlignment="Center" Margin="0,2,0,6">
                                 <CheckBox x:Name="ExcludeCaptureCheckBox" Content="防截圖 / 防螢幕分享曝光 (Teams/Zoom 分享桌面時完全隱形)" Foreground="#6A9955" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
                                 <CheckBox x:Name="AutoHideCheckBox" Content="滑鼠移開視窗自動 0% 透明隱形" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
                                 <CheckBox x:Name="TopmostCheckBox" Content="視窗永遠置頂" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
                                 <CheckBox x:Name="HideAltTabCheckBox" Content="從 Alt+Tab 清單中隱藏" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" Margin="0,0,0,4" Checked="StealthCheckBox_Changed" Unchecked="StealthCheckBox_Changed" />
                             </WrapPanel>
+
+                            <!-- 5. 書庫自動複製存放路徑 -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="書庫存放路徑：" Foreground="#CCCCCC" FontSize="11" VerticalAlignment="Center" />
+                                <TextBox x:Name="CustomBooksDirBox"
+                                         Grid.Column="1"
+                                         Background="#2A2D2E"
+                                         Foreground="#DDDDDD"
+                                         BorderBrush="#44888888"
+                                         Padding="4,2"
+                                         FontSize="11"
+                                         ToolTip="留空代表預設存放於程式目錄下 data\books（匯入時自動複製並以 GUID 偽裝命名，原始檔刪除也不影響閱讀）"
+                                         LostFocus="CustomBooksDirBox_LostFocus"
+                                         KeyDown="CustomBooksDirBox_KeyDown" />
+                                <Button Grid.Column="2" Style="{StaticResource StealthBtn}" Content="瀏覽資料夾..." Margin="4,0,2,0" Padding="6,2" Click="BtnBrowseBooksDir_Click" />
+                                <Button Grid.Column="3" Style="{StaticResource StealthBtn}" Content="預設本地(data\books)" Margin="2,0,0,0" Padding="6,2" Click="BtnResetBooksDir_Click" />
+                            </Grid>
 
                             <TextBlock Text="快捷鍵總覽：[Alt+Q] 老闆鍵(瞬隱或假報錯) · [Alt+G] 滑鼠點擊穿透幽靈模式 · [Alt+J / Alt+K] 穿透時全域上下捲動 · [Ctrl+L] 切換Log/C#偽裝外殼 · [F5] 自動滾動巡航 · [Ctrl+F] 全書搜尋 · [Ctrl+D] 加入書籤 · [Ctrl/Alt/Shift+滾輪] 縮放字級/文字透明/背景透明"
                                        Foreground="#777777" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" />

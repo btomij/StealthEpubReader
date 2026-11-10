@@ -110,7 +110,8 @@ public partial class MainWindow : Window
             var targetBook = _storage.Library.FirstOrDefault(b => b.Id == _storage.Settings.LastOpenedBookId)
                              ?? _storage.Library.OrderByDescending(b => b.LastReadTime).First();
 
-            if (File.Exists(targetBook.FilePath))
+            string resolvedPath = _storage.ResolveBookFilePath(targetBook);
+            if (File.Exists(resolvedPath))
             {
                 await LoadBookAsync(targetBook);
             }
@@ -194,6 +195,7 @@ public partial class MainWindow : Window
         AutoHideCheckBox.IsChecked = s.AutoHideOnMouseLeave;
         TopmostCheckBox.IsChecked = s.Topmost;
         HideAltTabCheckBox.IsChecked = s.HideFromAltTab;
+        CustomBooksDirBox.Text = s.CustomBooksDirectory;
 
         UpdateTopBarStatusButtons();
     }
@@ -270,19 +272,28 @@ public partial class MainWindow : Window
             return;
         }
 
-        string fullPath = Path.GetFullPath(filePath);
+        string fullSourcePath = Path.GetFullPath(filePath);
+        string sourceHash = StorageService.ComputeFileSha256(fullSourcePath);
+
+        // 以檔案內容 SHA-256 或解析後路徑去重
         var existing = _storage.Library.FirstOrDefault(b =>
-            string.Equals(Path.GetFullPath(b.FilePath), fullPath, StringComparison.OrdinalIgnoreCase));
+            (!string.IsNullOrEmpty(sourceHash) && string.Equals(b.ContentHash, sourceHash, StringComparison.OrdinalIgnoreCase)) ||
+            string.Equals(_storage.ResolveBookFilePath(b), fullSourcePath, StringComparison.OrdinalIgnoreCase));
 
         if (existing == null)
         {
-            var (title, author, totalChapters) = await _epubEngine.OpenBookAsync(fullPath);
+            string bookId = Guid.NewGuid().ToString("N");
+            // 先複製一份到受管理的本地/指定書庫目錄（以 {BookId}.epub 命名防曝光、防原始檔遺失）
+            var (storedPath, resolvedFullPath, contentHash) = _storage.CopyBookToManagedStorage(fullSourcePath, bookId);
+            var (title, author, totalChapters) = await _epubEngine.OpenBookAsync(resolvedFullPath);
+
             existing = new BookItem
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = bookId,
                 Title = title,
                 Author = author,
-                FilePath = fullPath,
+                FilePath = storedPath,
+                ContentHash = contentHash,
                 TotalChapters = Math.Max(1, totalChapters),
                 CurrentChapterIndex = 0,
                 ScrollRatio = 0.0,
@@ -290,6 +301,14 @@ public partial class MainWindow : Window
                 LastReadTime = DateTime.Now
             };
             _storage.Library.Insert(0, existing);
+            _storage.SaveImmediately();
+        }
+        else if (!File.Exists(_storage.ResolveBookFilePath(existing)))
+        {
+            // 若書庫已有紀錄但託管檔案遺失，重新複製補齊
+            var (storedPath, _, contentHash) = _storage.CopyBookToManagedStorage(fullSourcePath, existing.Id);
+            existing.FilePath = storedPath;
+            existing.ContentHash = contentHash;
             _storage.SaveImmediately();
         }
 
@@ -309,7 +328,8 @@ public partial class MainWindow : Window
         {
             SaveCurrentBookProgressImmediately();
 
-            var (title, author, totalChapters) = await _epubEngine.OpenBookAsync(book.FilePath);
+            string resolvedPath = _storage.ResolveBookFilePath(book);
+            var (title, author, totalChapters) = await _epubEngine.OpenBookAsync(resolvedPath);
             book.Title = title;
             book.Author = author;
             book.TotalChapters = Math.Max(1, totalChapters);
@@ -391,7 +411,8 @@ public partial class MainWindow : Window
 
         double chapterPct = Math.Round(ratio * 100.0, 0);
         string shieldTag = _storage.Settings.ExcludeFromCapture ? "[防截圖] " : "";
-        StatusTextBlock.Text = $"{shieldTag}{_currentBook.Title} · [{_currentBook.CurrentChapterIndex + 1}/{_currentBook.TotalChapters}] {_currentBook.CurrentChapterTitle} ({chapterPct}% | 全書 {_currentBook.OverallProgressPercent:0.0}%)";
+        string ghostTag = _win32Stealth.IsClickThroughEnabled ? "[穿透中:Alt+G/F8解除] " : "";
+        StatusTextBlock.Text = $"{ghostTag}{shieldTag}{_currentBook.Title} · [{_currentBook.CurrentChapterIndex + 1}/{_currentBook.TotalChapters}] {_currentBook.CurrentChapterTitle} ({chapterPct}% | 全書 {_currentBook.OverallProgressPercent:0.0}%)";
     }
 
     private void SaveCurrentBookProgressImmediately()
@@ -526,9 +547,22 @@ public partial class MainWindow : Window
 
     private async Task ScrollStepOrNextChapterAsync(bool down)
     {
-        if (_isPanicFakeScreenActive) return;
-
         double step = _storage.Settings.ScrollStepPixels;
+
+        // 若處於假報錯 StackTrace 畫面，支援滑鼠滾輪與方向鍵正常上下滾動檢視日誌（不跨章、不覆寫書籍進度）
+        if (_isPanicFakeScreenActive)
+        {
+            if (down)
+            {
+                ReaderScrollViewer.ScrollToVerticalOffset(ReaderScrollViewer.VerticalOffset + step);
+            }
+            else
+            {
+                ReaderScrollViewer.ScrollToVerticalOffset(Math.Max(0, ReaderScrollViewer.VerticalOffset - step));
+            }
+            return;
+        }
+
         if (down)
         {
             if (ReaderScrollViewer.VerticalOffset >= ReaderScrollViewer.ScrollableHeight - 0.5 &&
@@ -597,13 +631,54 @@ public partial class MainWindow : Window
 
     private void ReaderScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (_isInitializing || _isRestoringScroll || _isPanicFakeScreenActive || _currentBook == null) return;
+        if (_isInitializing || _isRestoringScroll) return;
+
+        if (_isPanicFakeScreenActive)
+        {
+            double maxScroll = Math.Max(1.0, ReaderScrollViewer.ScrollableHeight);
+            double curOffset = ReaderScrollViewer.VerticalOffset;
+            int approxLine = 1 + (int)Math.Round((curOffset / maxScroll) * 168);
+            StatusTextBlock.Text = $"[DIAGNOSTIC-ERR] SqlClient Timeout (0x80131904) | Buffer Line {approxLine}/172 | Offset {(int)curOffset}px";
+            return;
+        }
+
+        if (_currentBook == null) return;
         UpdateReadingProgressAndStatus();
         _storage.ScheduleSave();
     }
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // 攔截視窗內 Alt 系統組合鍵，避免 WPF 進入 Win32 系統選單模式 (SC_KEYMENU) 吃掉按鍵
+        if (e.Key == Key.System)
+        {
+            if (e.SystemKey == Key.G)
+            {
+                e.Handled = true;
+                _win32Stealth.TriggerGhostToggleDebounced();
+                return;
+            }
+            if (e.SystemKey == Key.J)
+            {
+                e.Handled = true;
+                await ScrollStepOrNextChapterAsync(down: true);
+                return;
+            }
+            if (e.SystemKey == Key.K)
+            {
+                e.Handled = true;
+                await ScrollStepOrNextChapterAsync(down: false);
+                return;
+            }
+        }
+
+        if (e.Key == Key.F8)
+        {
+            e.Handled = true;
+            _win32Stealth.TriggerGhostToggleDebounced();
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.B)
         {
             e.Handled = true;
@@ -698,7 +773,7 @@ public partial class MainWindow : Window
             case Key.PageDown:
             case Key.Space:
                 e.Handled = true;
-                if (ReaderScrollViewer.VerticalOffset >= ReaderScrollViewer.ScrollableHeight - 1.0)
+                if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset >= ReaderScrollViewer.ScrollableHeight - 1.0)
                 {
                     if (_currentBook != null && _currentBook.CurrentChapterIndex < _epubEngine.TotalChapters - 1)
                     {
@@ -714,7 +789,7 @@ public partial class MainWindow : Window
             case Key.Left:
             case Key.PageUp:
                 e.Handled = true;
-                if (ReaderScrollViewer.VerticalOffset <= 1.0)
+                if (!_isPanicFakeScreenActive && ReaderScrollViewer.VerticalOffset <= 1.0)
                 {
                     if (_currentBook != null && _currentBook.CurrentChapterIndex > 0)
                     {
@@ -826,9 +901,20 @@ public partial class MainWindow : Window
         if (nextState)
         {
             CloseDrawers();
+            ApplyMouseStealthState(isMouseInside: true);
         }
+
         _win32Stealth.SetClickThrough(nextState);
+
+        if (!nextState)
+        {
+            Show();
+            Activate();
+            ApplyMouseStealthState(isMouseInside: true);
+        }
+
         UpdateTopBarStatusButtons();
+        UpdateReadingProgressAndStatus();
     }
 
     private void CycleCamouflageMode()
@@ -1250,6 +1336,11 @@ public partial class MainWindow : Window
     {
         if (_activeDrawerTab == DrawerTab.Books && BooksListBox.SelectedItem is BookItem selectedBook)
         {
+            if (_currentBook?.Id == selectedBook.Id)
+            {
+                _epubEngine.DisposeCurrentBook();
+            }
+            _storage.DeleteManagedBookFile(selectedBook);
             _storage.Library.Remove(selectedBook);
             _storage.SaveImmediately();
             RefreshLibraryList();
@@ -1504,6 +1595,50 @@ public partial class MainWindow : Window
         UpdateTopBarStatusButtons();
         UpdateReadingProgressAndStatus();
         _storage.ScheduleSave();
+    }
+
+    private void CustomBooksDirBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        ApplyCustomBooksDirectoryInput();
+    }
+
+    private void CustomBooksDirBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            ApplyCustomBooksDirectoryInput();
+        }
+    }
+
+    private void ApplyCustomBooksDirectoryInput()
+    {
+        if (_isInitializing) return;
+        _storage.Settings.CustomBooksDirectory = CustomBooksDirBox.Text.Trim();
+        _storage.GetActiveBooksDirectory();
+        _storage.SaveImmediately();
+    }
+
+    private void BtnBrowseBooksDir_Click(object sender, RoutedEventArgs e)
+    {
+        using var dlg = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "選擇書庫 EPUB 檔案自動複製存放的資料夾",
+            SelectedPath = _storage.GetActiveBooksDirectory(),
+            ShowNewFolderButton = true
+        };
+
+        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(dlg.SelectedPath))
+        {
+            CustomBooksDirBox.Text = dlg.SelectedPath;
+            ApplyCustomBooksDirectoryInput();
+        }
+    }
+
+    private void BtnResetBooksDir_Click(object sender, RoutedEventArgs e)
+    {
+        CustomBooksDirBox.Text = string.Empty;
+        ApplyCustomBooksDirectoryInput();
     }
 
     #endregion

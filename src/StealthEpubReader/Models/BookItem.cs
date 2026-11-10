@@ -8,6 +8,7 @@ public class BookItem
     public string Title { get; set; } = string.Empty;
     public string Author { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
+    public string ContentHash { get; set; } = string.Empty;
     public int TotalChapters { get; set; } = 1;
     public int CurrentChapterIndex { get; set; } = 0;
     public string CurrentChapterTitle { get; set; } = string.Empty;
